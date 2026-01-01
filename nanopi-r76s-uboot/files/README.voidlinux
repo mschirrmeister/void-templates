@@ -1,0 +1,17 @@
+There are different options for where to install U-Boot on the RockPro64.
+Below are commands that can be used to write U-Boot to various locations.
+
+# Write U-Boot to SD Card or eMMC
+
+# SD Card
+export target_dev=/dev/mmcblk0
+# eMMC
+export target_dev=/dev/mmcblk1
+dd if=/usr/lib/nanopi-r76s-uboot/u-boot-rockchip.bin of=${target_dev} seek=64
+or
+dd if=/usr/lib/nanopi-r76s-uboot/idbloader.img of=${target_dev} seek=64
+dd if=/usr/lib/nanopi-r76s-uboot/u-boot.itb of=${target_dev} seek=16384
+
+
+For more information see the U-Boot documentation:
+https://github.com/u-boot/u-boot/blob/v2025.10/doc/board/rockchip/rockchip.rst

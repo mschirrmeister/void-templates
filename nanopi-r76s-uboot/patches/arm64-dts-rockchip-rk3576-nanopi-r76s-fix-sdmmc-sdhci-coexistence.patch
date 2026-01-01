@@ -1,0 +1,60 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Marco Schirrmeister <mschirrmeister@gmail.com>
+Date: Sat, 6 Dec 2025 23:56:46 +0100
+Subject: [PATCH] arm64: dts: rockchip: rk3576-nanopi-r76s: fix sdmmc/sdhci coexistence
+
+The NanoPi R76S (RK3576) features both a DW‑MMC controller for the
+microSD socket (sdmmc) and an Arasan SDHCI controller for the on‑board
+eMMC (sdhci).  When both were enabled, the shared I/O voltage rail caused
+initialisation conflicts: the eMMC required 1.8 V signalling while the
+SD card logic expected 3.3 V.
+
+This patch aligns the DTS and U‑Boot configuration so that both storage
+controllers operate correctly:
+
+- Enable CONFIG_MMC_SDHCI and CONFIG_MMC_SDHCI_ROCKCHIP in U‑Boot.
+- Add explicit `vmmc-supply` and `vqmmc-supply` properties to the
+  eMMC (sdhci) node.
+- Add `no-1-8-v;` to the SDMMC node to keep the µSD socket fixed at
+  3.3 V.
+
+With these adjustments the board can access both the microSD and eMMC
+devices simultaneously, and U‑Boot can boot directly from either medium.
+
+Signed-off-by: Marco Schirrmeister <mschirrmeister@gmail.com>
+---
+diff --git a/dts/upstream/src/arm64/rockchip/rk3576-nanopi-r76s.dts b/dts/upstream/src/arm64/rockchip/rk3576-nanopi-r76s.dts
+index 11111111111..22222222222 100644
++++ a/dts/upstream/src/arm64/rockchip/rk3576-nanopi-r76s.dts 2025-12-06 23:33:40.013947291 +0100
++++ b/dts/upstream/src/arm64/rockchip/rk3576-nanopi-r76s.dts 2025-12-06 23:56:46.961392491 +0100
+@@ -772,6 +772,7 @@
+ 	status = "okay";
+ };
+ 
++/* eMMC on the Arasan/SDHCI host */
+ &sdhci {
+ 	bus-width = <8>;
+ 	full-pwr-cycle-in-suspend;
+@@ -781,9 +782,13 @@
+ 	no-sdio;
+ 	no-sd;
+ 	non-removable;
++	/* add the supply rails for completeness */
++	vmmc-supply  = <&vcc_3v3_s3>;  /* main VCC rail */
++	vqmmc-supply = <&vcc_1v8_s3>;  /* I/O rail */
+ 	status = "okay";
+ };
+ 
++/* µSD socket on the DW‑MMC host */
+ &sdmmc {
+ 	max-frequency = <200000000>;
+ 	no-sdio;
+@@ -795,6 +800,8 @@
+ 	sd-uhs-sdr104;
+ 	vmmc-supply = <&vcc_3v3_s3>;
+ 	vqmmc-supply = <&vccio_sd_s0>;
++	/* keep this host at 3.3 V so it works when eMMC uses 1.8 V */
++	no-1-8-v;
+ 	pinctrl-names = "default";
+ 	status = "okay";
+ };
