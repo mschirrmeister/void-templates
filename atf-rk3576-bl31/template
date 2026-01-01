@@ -1,0 +1,26 @@
+# Template file for 'atf-rk3576-bl31'
+pkgname=atf-rk3576-bl31
+version=2.14.0
+revision=1
+archs="aarch64*"
+hostmakedepends="dtc"
+short_desc="ARM Trusted Firmware for Rockchip rk3576 boards (ARMv8, bl31 option)"
+maintainer="Marco Schirrmeister <mschirrmeister@gmail.com>"
+license="BSD-3-Clause"
+homepage="https://developer.trustedfirmware.org/dashboard/view/6/"
+distfiles="https://github.com/ARM-software/arm-trusted-firmware/archive/refs/tags/v${version}.tar.gz"
+checksum=d44936677a63c5216ffc151ae7711d458c992ef159a9df271fd9429f0a1cb5e5
+nostrip=yes
+
+do_build() {
+	unset CFLAGS CXXFLAGS CPPFLAGS LDFLAGS
+	if [ "$CROSS_BUILD" ]; then
+		export CROSS_COMPILE=${XBPS_CROSS_TRIPLET}-
+	fi
+	make ${makejobs} PLAT=rk3576 AS=gcc bl31
+}
+
+do_install() {
+	vinstall build/rk3576/release/bl31/bl31.elf 0755 usr/lib/trusted-firmware-a/rk3576
+	vlicense docs/license.rst
+}
