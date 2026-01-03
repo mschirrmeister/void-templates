@@ -1,0 +1,105 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Marco Schirrmeister <mschirrmeister@gmail.com>
+Date: Sat, 3 Jan 2026 19:00:00 +0100
+Subject: [PATCH] mmc: host: dw_mmc-rockchip: add rockchip,disable-runtime-pm quirk
+
+The NanoPi R76S (RK3576) suffers from a persistent reset loop on the 
+microSD (dw_mmc) bus during idle periods. Investigations reveal that 
+the RK3576's internal phase shifter loses its lock when the controller 
+is runtime-suspended or when internal hardware autogating is active.
+
+This patch introduces a new 'rockchip,disable-runtime-pm' Boolean 
+property to the dw_mmc-rockchip driver and applies it to the 
+NanoPi R76S device tree to stabilize the link:
+
+- In dw_mci_rockchip_init, the property is used to explicitly disable 
+  internal clock autogating in the MISC_CON register.
+- In dw_mci_rockchip_probe, the property inhibits the standard 50ms 
+  autosuspend delay and increments the device usage count to keep 
+  clocks hot and the controller active.
+- The NanoPi R76S DTS is updated to include the new quirk flag for 
+  the SDMMC node.
+
+These changes prevent the bus from flapping between SDR104 and 400kHz, 
+ensuring stable high-speed I/O performance on affected Rockchip boards.
+
+Signed-off-by: Marco Schirrmeister <mschirrmeister@gmail.com>
+---
+--- a/drivers/mmc/host/dw_mmc-rockchip.c        2025-12-28 22:24:26.000000000 +0100
++++ b/drivers/mmc/host/dw_mmc-rockchip.c        2026-01-03 16:09:22.979891392 +0100
+
+@@ -497,7 +497,14 @@
+ 			dev_warn(host->dev, "no valid minimum freq: %d\n", ret);
+ 	}
+ 
+-	if (priv->internal_phase)
++	/*
++	 * On some RK3576 boards like the NanoPi R76S, internal clock autogating
++	 * can cause the phase-lock loop to drift or reset during idle. 
++	 * Check for the 'rockchip,disable-runtime-pm' quirk to skip this.
++	 */
++	if (of_property_read_bool(host->dev->of_node, "rockchip,disable-runtime-pm"))
++		mci_writel(host, MISC_CON, 0x0);
++	else if (priv->internal_phase)
+ 		mci_writel(host, MISC_CON, MEM_CLK_AUTOGATE_ENABLE);
+ 
+ 	return 0;
+@@ -538,6 +545,7 @@
+ {
+ 	const struct dw_mci_drv_data *drv_data;
+ 	const struct of_device_id *match;
++	bool disable_rpm = of_property_read_bool(pdev->dev.of_node, "rockchip,disable-runtime-pm");
+ 	int ret;
+ 
+ 	if (!pdev->dev.of_node)
+@@ -549,8 +557,12 @@
+ 	pm_runtime_get_noresume(&pdev->dev);
+ 	pm_runtime_set_active(&pdev->dev);
+ 	pm_runtime_enable(&pdev->dev);
+-	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
+-	pm_runtime_use_autosuspend(&pdev->dev);
++
++	/* Only setup autosuspend if the DTS hasn't prohibited it */
++	if (!disable_rpm) {
++		pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
++		pm_runtime_use_autosuspend(&pdev->dev);
++	}
+ 
+ 	ret = dw_mci_pltfm_register(pdev, drv_data);
+ 	if (ret) {
+@@ -560,7 +572,20 @@
+ 		return ret;
+ 	}
+ 
+-	pm_runtime_put_autosuspend(&pdev->dev);
++	/* 
++	 * For boards with sensitive signaling like the RK3576-based NanoPi R76S,
++	 * we inhibit runtime PM to prevent bus resets during idle transitions.
++	 */
++	if (of_property_read_bool(pdev->dev.of_node, "rockchip,disable-runtime-pm")) {
++		/* 
++		 * Instead of nuclear option (pm_runtime_forbid), we use 
++		 * the "soft" way by incrementing the usage count to 
++		 * prevent the controller from ever hitting runtime_suspend.
++		 */
++		pm_runtime_get_noresume(&pdev->dev);
++	} else {
++		pm_runtime_put_autosuspend(&pdev->dev);
++	}
+ 
+ 	return 0;
+ }
+--- a/arch/arm64/boot/dts/rockchip/rk3576-nanopi-r76s.dts	2025-12-28 22:24:26.000000000 +0100
++++ b/arch/arm64/boot/dts/rockchip/rk3576-nanopi-r76s.dts	2026-01-03 18:08:25.439704244 +0100
+@@ -758,6 +758,11 @@
+ 	vmmc-supply = <&vcc_3v3_s3>;
+ 	vqmmc-supply = <&vccio_sd_s0>;
+ 	status = "okay";
++	/* 
++	 * Custom quirk: prevents the 400kHz reset loop on NanoPi R76S 
++	 * by keeping the controller and clocks active during idle.
++	 */
++	rockchip,disable-runtime-pm;
+ };
+ 
+ &sdio {
