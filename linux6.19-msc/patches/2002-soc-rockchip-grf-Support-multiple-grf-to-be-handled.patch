@@ -1,0 +1,92 @@
+From: Shawn Lin <shawn.lin@rock-chips.com>
+Subject: [PATCH v4 2/5] soc: rockchip: grf: Support multiple grf to be handled
+
+Currently, only the first matched node will be handled. This leads
+to jtag switching broken for RK3576, as rk3576-sys-grf is found before
+rk3576-ioc-grf. Change the code to scan all the possible node to fix
+the problem.
+
+Fixes: e1aaecacfa13 ("soc: rockchip: grf: Add rk3576 default GRF values")
+Cc: Detlev Casanova <detlev.casanova@collabora.com>
+Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+Tested-by: Marco Schirrmeister <mschirrmeister@gmail.com>
+---
+
+Changes in v4:
+- none
+
+Changes in v3:
+- remove of_node_put() (Heiko)
+
+Changes in v2:
+- use for_each_matching_node_and_match(Heiko)
+
+ drivers/soc/rockchip/grf.c | 55 +++++++++++++++++++++++-----------------------
+ 1 file changed, 27 insertions(+), 28 deletions(-)
+
+diff --git a/drivers/soc/rockchip/grf.c b/drivers/soc/rockchip/grf.c
+index 8974d1c..04937c4 100644
+--- a/drivers/soc/rockchip/grf.c
++++ b/drivers/soc/rockchip/grf.c
+@@ -217,34 +217,33 @@ static int __init rockchip_grf_init(void)
+ 	struct regmap *grf;
+ 	int ret, i;
+ 
+-	np = of_find_matching_node_and_match(NULL, rockchip_grf_dt_match,
+-					     &match);
+-	if (!np)
+-		return -ENODEV;
+-	if (!match || !match->data) {
+-		pr_err("%s: missing grf data\n", __func__);
+-		of_node_put(np);
+-		return -EINVAL;
+-	}
+-
+-	grf_info = match->data;
+-
+-	grf = syscon_node_to_regmap(np);
+-	of_node_put(np);
+-	if (IS_ERR(grf)) {
+-		pr_err("%s: could not get grf syscon\n", __func__);
+-		return PTR_ERR(grf);
+-	}
+-
+-	for (i = 0; i < grf_info->num_values; i++) {
+-		const struct rockchip_grf_value *val = &grf_info->values[i];
+-
+-		pr_debug("%s: adjusting %s in %#6x to %#10x\n", __func__,
+-			val->desc, val->reg, val->val);
+-		ret = regmap_write(grf, val->reg, val->val);
+-		if (ret < 0)
+-			pr_err("%s: write to %#6x failed with %d\n",
+-			       __func__, val->reg, ret);
++	for_each_matching_node_and_match(np, rockchip_grf_dt_match, &match) {
++		if (!of_device_is_available(np))
++			continue;
++		if (!match || !match->data) {
++			pr_err("%s: missing grf data\n", __func__);
++			of_node_put(np);
++			return -EINVAL;
++		}
++
++		grf_info = match->data;
++
++		grf = syscon_node_to_regmap(np);
++		if (IS_ERR(grf)) {
++			pr_err("%s: could not get grf syscon\n", __func__);
++			return PTR_ERR(grf);
++		}
++
++		for (i = 0; i < grf_info->num_values; i++) {
++			const struct rockchip_grf_value *val = &grf_info->values[i];
++
++			pr_debug("%s: adjusting %s in %#6x to %#10x\n", __func__,
++				val->desc, val->reg, val->val);
++			ret = regmap_write(grf, val->reg, val->val);
++			if (ret < 0)
++				pr_err("%s: write to %#6x failed with %d\n",
++					__func__, val->reg, ret);
++		}
+ 	}
+ 
+ 	return 0;
