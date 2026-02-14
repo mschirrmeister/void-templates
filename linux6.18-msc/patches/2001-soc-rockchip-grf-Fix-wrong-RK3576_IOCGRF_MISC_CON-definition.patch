@@ -1,0 +1,33 @@
+From: Shawn Lin <shawn.lin@rock-chips.com>
+Subject: [PATCH v4 1/5] soc: rockchip: grf: Fix wrong RK3576_IOCGRF_MISC_CON
+ definition
+Date: Fri, 16 Jan 2026 08:55:28 +0800
+
+RK3576_IOCGRF_MISC_CON is IOC_GRF + 0x40F0, fix it.
+
+Fixes: e1aaecacfa13 ("soc: rockchip: grf: Add rk3576 default GRF values")
+Cc: Detlev Casanova <detlev.casanova@collabora.com>
+Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+Reviewed-by: Chaoyi Chen <chaoyi.chen@rock-chips.com>
+Tested-by: Marco Schirrmeister <mschirrmeister@gmail.com>
+---
+
+Changes in v3: None
+Changes in v2: None
+
+ drivers/soc/rockchip/grf.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/soc/rockchip/grf.c b/drivers/soc/rockchip/grf.c
+index 27bfa09..8974d1c 100644
+--- a/drivers/soc/rockchip/grf.c
++++ b/drivers/soc/rockchip/grf.c
+@@ -146,7 +146,7 @@ static const struct rockchip_grf_info rk3576_sysgrf __initconst = {
+ 	.num_values = ARRAY_SIZE(rk3576_defaults_sys_grf),
+ };
+ 
+-#define RK3576_IOCGRF_MISC_CON		0x04F0
++#define RK3576_IOCGRF_MISC_CON		0x40F0
+ 
+ static const struct rockchip_grf_value rk3576_defaults_ioc_grf[] __initconst = {
+ 	{ "jtag switching", RK3576_IOCGRF_MISC_CON, FIELD_PREP_WM16_CONST(BIT(1), 0) },
