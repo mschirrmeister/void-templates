@@ -1,6 +1,6 @@
 # Template file for 'linux6.19-msc'
 pkgname=linux6.19-msc
-version=6.19.6
+version=6.19.7
 revision=1
 archs="aarch64*"
 short_desc="Mainline Linux kernel (stable branch)"
