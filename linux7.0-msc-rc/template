@@ -1,7 +1,7 @@
 # Template file for 'linux7.0-msc-rc'
 pkgname=linux7.0-msc-rc
 version=7.0.rc4
-revision=1
+revision=2
 archs="aarch64*"
 short_desc="Mainline Linux kernel (dev branch)"
 maintainer="Marco Schirrmeister <mschirrmeister@gmail.com>"
