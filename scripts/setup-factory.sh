@@ -18,7 +18,7 @@ for d in "$TEMPLATE_ROOT"/*/; do
 
     # 2. Skip the usual suspects
     case "$pkg" in
-        scripts|files|patches|.git) continue ;;
+        scripts|files|patches|temp|.git) continue ;;
     esac
 
     # 3. THE SECURITY CHECK: Only sync if it has a 'template' file
