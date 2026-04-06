@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm64 7.0.0-rc6 Kernel Configuration
+# Linux/arm64 7.0.0-rc7 Kernel Configuration
 #
 CONFIG_CC_VERSION_TEXT="gcc (GCC) 14.2.1 20250405"
 CONFIG_CC_IS_GCC=y
@@ -2592,7 +2592,6 @@ CONFIG_CB710_CORE=m
 CONFIG_CB710_DEBUG_ASSUMPTIONS=y
 # CONFIG_SENSORS_LIS3_I2C is not set
 # CONFIG_ALTERA_STAPL is not set
-# CONFIG_INTEL_MEI is not set
 # CONFIG_VMWARE_VMCI is not set
 # CONFIG_GENWQE is not set
 # CONFIG_BCM_VK is not set
