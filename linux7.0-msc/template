@@ -1,0 +1,179 @@
+# Template file for 'linux7.0-msc'
+pkgname=linux7.0-msc
+version=7.0.0
+revision=1
+archs="aarch64*"
+short_desc="Mainline Linux kernel (stable branch)"
+maintainer="Marco Schirrmeister <mschirrmeister@gmail.com>"
+license="GPL-2.0-only"
+homepage="https://www.kernel.org"
+# Replace the first dot followed by 'rc' with a dash and 'rc'
+#_distver="${version/.rc/-rc}"
+#distfiles="https://git.kernel.org/stable/t/linux-${_distver}.tar.gz"
+KERNEL_SITE="https://cdn.kernel.org/pub/linux"
+
+case "${version##*.}" in
+rc*) distfiles="https://git.kernel.org/torvalds/t/linux-${version%.*}-${version##*.}.tar.gz" ;;
+*)
+	distfiles="${KERNEL_SITE}/kernel/v${version%%.*}.x/linux-${version%.*}.tar.xz"
+	if [ "${version##*.}" != 0 ]; then
+		distfiles+=" ${KERNEL_SITE}/kernel/v${version%%.*}.x/patch-${version}.xz"
+		skip_extraction="patch-${version}.xz"
+	fi
+esac
+
+checksum=bb7f6d80b387c757b7d14bb93028fcb90f793c5c0d367736ee815a100b3891f0
+
+# --- Syndicate Standards ---
+nodebug=yes
+nostrip=yes
+noverifyrdeps=yes
+noshlibprovides=yes
+preserve=yes
+python_version=3
+
+hostmakedepends="tar xz bc elfutils-devel flex gmp-devel kmod libmpc-devel
+ pkg-config openssl-devel perl uboot-mkimage cpio pahole python3 zstd dtc"
+
+# This enables the automatic initramfs generation
+_kernver="${version/rc/0-rc}-msc_${revision}"
+triggers="kernel-hooks"
+kernel_hooks_version="${_kernver}"
+
+export KBUILD_BUILD_TIMESTAMP=$(LC_ALL=C date -ud @${SOURCE_DATE_EPOCH:-0})
+export KBUILD_BUILD_USER=msc-syndicate
+export KBUILD_BUILD_HOST=voidlinux
+
+post_extract() {
+	# doing this in post_extract instead of *_patch, so that ./xbps-src extract
+	# will have the actual kernel release source code and additional patches
+	# can be applied with ./xbps-src patch in the next step.
+	if [ ! -f $XBPS_SRCDISTDIR/$pkgname-$version/patch-${version}.xz ]; then
+		return
+	fi
+	xzcat $XBPS_SRCDISTDIR/$pkgname-$version/patch-${version}.xz |
+		patch -sNp1 -F0
+}
+
+post_patch() {
+	# avoid the strip wrapper, its used to copy the objects to a new location
+	# and required to avoid absolute relocations.
+	vsed -e "s|\$(STRIP) \(--strip-debug -o \$@ \$<;\)|/usr/bin/${STRIP} \1|" -i drivers/firmware/efi/libstub/Makefile
+
+	# parallel pahole crashes on i686, do one job for now
+	vsed -i "s/\(\$(pahole-flags-y)\)/\1 --jobs=1/" -i scripts/Makefile.btf
+}
+
+do_configure() {
+	local _arch="arm64"
+	local _dts_dir="arch/arm64/boot/dts/rockchip"
+
+	if [ -f "${FILESDIR}/rk3399-orangepi-4-lts.dts" ]; then
+		msg_normal "Injecting custom Orange Pi 4 LTS DTS...\n"
+		cp -f "${FILESDIR}/rk3399-orangepi-4-lts.dts" "${_dts_dir}/"
+	fi
+	
+	if [ -f ${FILESDIR}/${_arch}-dotconfig ]; then
+		cp -f ${FILESDIR}/${_arch}-dotconfig .config
+		make ARCH=${_arch} ${makejobs} olddefconfig
+	else
+		msg_error "Missing ${_arch}-dotconfig in FILESDIR!\n"
+	fi
+
+	# Always use our revision to CONFIG_LOCALVERSION
+	sed -i -e "s|^\(CONFIG_LOCALVERSION=\).*|\1\"-msc_${revision}\"|" .config
+}
+
+do_build() {
+	export LDFLAGS=
+	make ARCH=arm64 ${makejobs} Image modules dtbs 
+}
+
+do_install() {
+	# 1. Install Modules
+	# Instead of symlinking /lib, we tell the kernel to go straight to /usr
+	make ARCH=arm64 ${makejobs} prepare scripts
+	sed -i '2iexit 0' scripts/depmod.sh
+	make ARCH=arm64 INSTALL_MOD_PATH=${DESTDIR}/usr modules_install
+
+	# Verify the folder name from the real disk
+	local _real_kernver=$(ls ${DESTDIR}/usr/lib/modules/)
+
+	# 2. Install Kernel and DTBs
+	vinstall arch/arm64/boot/Image 644 boot vmlinux-${_kernver}
+	make ARCH=arm64 INSTALL_DTBS_PATH=${DESTDIR}/boot/dtbs/dtbs-${_kernver} dtbs_install
+	
+	vinstall .config 644 boot config-${_kernver}
+	vinstall System.map 644 boot System.map-${_kernver}
+
+	# 3. Cleanup Stubs
+	rm -rf ${DESTDIR}/usr/lib/firmware
+	rm -f ${DESTDIR}/usr/lib/modules/${_real_kernver}/source
+	rm -f ${DESTDIR}/usr/lib/modules/${_real_kernver}/build
+
+	# 4. Prep Headers
+	local hdrdest=${DESTDIR}/usr/src/kernel-headers-${_kernver}
+	vmkdir usr/src/kernel-headers-${_kernver}
+	
+	# Copy the core blueprints
+	cp Makefile Kbuild .config Module.symvers ${hdrdest}
+	cp -a scripts ${hdrdest}
+	
+	mkdir -p ${hdrdest}/include
+	for i in config generated uapi linux; do
+		if [ -d include/$i ]; then
+			cp -a include/$i ${hdrdest}/include/
+		fi
+	done
+	
+	find . -name 'Kconfig*' -o -name '*.h' | cpio -pudm ${hdrdest}
+	
+	mkdir -p ${hdrdest}/arch/arm64
+	cp -a arch/arm64/include ${hdrdest}/arch/arm64/
+	cp arch/arm64/Makefile ${hdrdest}/arch/arm64/
+	
+	# 5. Link for DKMS (Crucial for bcachefs)
+	ln -sf /usr/src/kernel-headers-${_kernver} ${DESTDIR}/usr/lib/modules/${_real_kernver}/build
+
+	# needed for mv-debug
+	cp scripts/sign-file "${XBPS_WRAPPERDIR}"
+
+	# Extract debugging symbols and compress modules
+	msg_normal "$pkgver: extracting debug info and compressing modules, please wait...\n"
+	install -Dm644 vmlinux ${DESTDIR}/usr/lib/debug/boot/vmlinux-${_kernver}
+	(
+	cd ${DESTDIR}
+	export DESTDIR
+	export SIGN_FILE="${XBPS_WRAPPERDIR}/sign-file sha512 ${wrksrc}/certs/signing_key.pem ${wrksrc}/certs/signing_key.x509"
+	find ./ -name '*.ko' -print0 | \
+		xargs -0r -n1 -P ${XBPS_MAKEJOBS} ${FILESDIR}/mv-debug
+	)
+	# ... and run depmod again.
+	depmod -b ${DESTDIR}/usr -F System.map ${_kernver}
+	rm -f ${DESTDIR}/lib
+}
+
+linux7.0-msc-headers_package() {
+	preserve=yes
+	nostrip=yes
+	noshlibprovides=yes
+	short_desc+=" - source headers for 3rd party modules"
+	pkg_install() {
+		vmove usr/src
+		vmove "usr/lib/modules/${_kernver}/build"
+	}
+}
+
+linux7.0-msc-dbg_package() {
+	preserve=yes
+	nostrip=yes
+	noverifyrdeps=yes
+	noshlibprovides=yes
+	repository=debug
+	short_desc+=" - debugging symbols"
+	pkg_install() {
+		vmove usr/lib/debug
+		vmove "boot/System.map-${_kernver}"
+	}
+}
+
