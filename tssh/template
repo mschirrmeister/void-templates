@@ -1,0 +1,26 @@
+# Template file for 'tssh'
+pkgname=tssh
+version=0.1.25
+revision=1
+build_style=go
+go_import_path="github.com/trzsz/trzsz-ssh"
+go_package="$go_import_path/cmd/tssh"
+short_desc="TSSH - SSH client with roaming, migration, and trzsz support"
+maintainer="Marco Schirrmeister <mschirrmeister@gmail.com>"
+license="MIT"
+homepage="https://trzsz.github.io/ssh"
+distfiles="https://github.com/trzsz/trzsz-ssh/archive/v${version}.tar.gz"
+checksum=8c7ef4ace4c7aed564f447f3f91142367f782eef87b58a95f587480ca1ae08ba
+
+# Hardening - Pure static Go build
+export CGO_ENABLED=0
+export GOFLAGS="-buildmode=pie -trimpath"
+
+
+post_install() {
+	vlicense LICENSE
+
+	# Stash the original README from the repo
+	vdoc README.md
+}
+
