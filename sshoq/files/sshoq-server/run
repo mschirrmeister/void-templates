@@ -1,0 +1,21 @@
+#!/bin/sh
+# Redirect stderr to stdout for the logger
+exec 2>&1
+
+DAEMON="/usr/bin/sshoq-server"
+CONFDIR="/etc/sshoq"
+STORAGE="/var/lib/sshoq"
+
+# Move into the safe house
+cd "$STORAGE"
+
+# Run the server. We use 'exec' so runit can track the PID.
+# You'll need to point to your actual certs and port here.
+exec $DAEMON \
+    -bind 0.0.0.0:8443 \
+    -url-path /secret-sshoq-server \
+    -cert "$CONFDIR/cert.pem" \
+    -key "$CONFDIR/key.pem" \
+    -v \
+    -generate-selfsigned-cert \
+    localhost

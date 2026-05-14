@@ -1,0 +1,4 @@
+#!/bin/sh
+# We want this to run as the sshoq user to keep the books clean
+# and we point it at our private stash.
+exec svlogd -tt /var/log/sshoq

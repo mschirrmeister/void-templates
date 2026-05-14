@@ -1,0 +1,57 @@
+# Template file for 'sshoq'
+pkgname=sshoq
+version=0.2.1
+revision=1
+build_style=go
+go_import_path="github.com/h4sh5/sshoq"
+go_package="./cmd/sshoq ./cmd/sshoq-server"
+makedepends="libxcrypt-devel"
+short_desc="SSH over QUIC - Client and Server components"
+maintainer="Marco Schirrmeister <mschirrmeister@gmail.com>"
+license="Apache-2.0"
+homepage="https://github.com/h4sh5/sshoq"
+distfiles="https://github.com/h4sh5/sshoq/archive/v${version}.tar.gz"
+checksum=65cf65ac422fb8072abfaabec86c20a74e448a93b489e896a36642e7049f5d32
+system_accounts="sshoq"
+sshoq_homedir="/var/lib/sshoq"
+
+# Hardening and Intelligence
+export GOFLAGS="-buildmode=pie -trimpath"
+go_ldflags="-extldflags=-Wl,-z,now,-z,relro"
+
+make_dirs="
+	/var/log/sshoq 0755 root root
+	/var/lib/sshoq	0755 root root
+	/etc/sshoq	0755 root root"
+
+post_install() {
+	vlicense LICENSE
+	# If they got systemd units in the repo, we leave 'em for the tourists.
+	# But we can drop a manual page or extra docs if they existed.
+
+	# Stash the original README from the repo
+	vdoc README.md
+
+	# Create the runit service
+	vsv sshoq-server
+	
+	# Create a custom cheat sheet on the fly
+	vmkdir usr/share/doc/sshoq
+	cat > "${DESTDIR}/usr/share/doc/sshoq/EXAMPLES" <<-_EOF
+		SSHOQ - Quick Start Intel
+		=========================
+		
+		1. Start the server:
+		   sshoq-server -bind 0.0.0.0:8443 -url-path /my-secret-server -v -generate-selfsigned-cert sshserver.home.local
+		
+		2. Connect from the client:
+		   sshoq -i ~/.ssh/id_ed25519 -insecure pi@10.0.0.11:8443/my-secret-server
+		
+		3. Tunneling a real SSH session over the QUIC connection:
+		   # Terminal 1: Open the tunnel
+		   sshoq -insecure -L 2222@10.0.0.12@22 pi@10.0.0.11:8443/my-secret-server
+		   # Terminal 2: Regular SSH through the tunnel
+		   ssh -p 2222 pi@127.0.0.1
+	_EOF
+}
+
