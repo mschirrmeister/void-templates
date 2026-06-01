@@ -1,6 +1,6 @@
 # Template file for 'linux6.18-msc'
 pkgname=linux6.18-msc
-version=6.18.33
+version=6.18.34
 revision=1
 archs="aarch64*"
 short_desc="Mainline Linux kernel (stable branch)"
@@ -10,7 +10,7 @@ homepage="https://www.kernel.org"
 # Replace the first dot followed by 'rc' with a dash and 'rc'
 _distver="${version/.rc/-rc}"
 distfiles="https://git.kernel.org/stable/t/linux-${_distver}.tar.gz"
-checksum=925ff41b480c2089d24eb8dffc0d1e048a1a517b1c196dfd99003e20d786b657
+checksum=840c8de08267447a3bdd5fdd14496c7b70f1e7157d9feebac78fddfad37f623f
 
 # --- Syndicate Standards ---
 nodebug=yes
