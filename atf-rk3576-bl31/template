@@ -1,6 +1,6 @@
 # Template file for 'atf-rk3576-bl31'
 pkgname=atf-rk3576-bl31
-version=2.14.0
+version=2.15.0
 revision=1
 archs="aarch64*"
 hostmakedepends="dtc"
