@@ -1,6 +1,6 @@
 # Template file for 'nanopi-r76s-uboot'
 pkgname=nanopi-r76s-uboot
-version=2026.04
+version=2026.07rc4
 revision=1
 archs="aarch64*"
 hostmakedepends="bison flex bc dtc which python3 swig python3-devel python3-setuptools python3-pyelftools openssl-devel libuuid-devel gnutls-devel ncurses-libtinfo-devel"
