@@ -1,7 +1,7 @@
 # Template file for 'nanopi-r76s-uboot'
 pkgname=nanopi-r76s-uboot
-version=2026.07rc4
-revision=2
+version=2026.07rc5
+revision=1
 archs="aarch64*"
 hostmakedepends="bison flex bc dtc which python3 swig python3-devel python3-setuptools python3-pyelftools openssl-devel libuuid-devel gnutls-devel ncurses-libtinfo-devel"
 makedepends="atf-rk3576-bl31"
@@ -46,6 +46,18 @@ do_configure() {
 	scripts/config --enable CONFIG_MMC_HS200_SUPPORT
 	scripts/config --enable CONFIG_MMC_HS400_SUPPORT
 	scripts/config --enable CONFIG_MMC_HS400_ES_SUPPORT
+	# additional stuff after defconfig is in upstream
+	scripts/config --enable CONFIG_CMD_ROCKUSB
+	scripts/config --enable CONFIG_CMD_USB_MASS_STORAGE
+	scripts/config --enable CONFIG_USB_GADGET
+	scripts/config --enable CONFIG_USB_GADGET_DOWNLOAD
+	scripts/config --enable CONFIG_USB_FUNCTION_ROCKUSB
+	scripts/config --enable CONFIG_PHY_REALTEK
+	scripts/config --enable CONFIG_DWC_ETH_QOS
+	scripts/config --enable CONFIG_DWC_ETH_QOS_ROCKCHIP
+	scripts/config --disable CONFIG_USB_FUNCTION_FASTBOOT
+	scripts/config --disable CONFIG_UDP_FUNCTION_FASTBOOT
+	scripts/config --disable CONFIG_TCP_FUNCTION_FASTBOOT
 	make ${makejobs} olddefconfig
 }
 
