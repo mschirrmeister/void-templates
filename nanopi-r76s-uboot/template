@@ -1,6 +1,6 @@
 # Template file for 'nanopi-r76s-uboot'
 pkgname=nanopi-r76s-uboot
-version=2026.07rc5
+version=2026.07
 revision=1
 archs="aarch64*"
 hostmakedepends="bison flex bc dtc which python3 swig python3-devel python3-setuptools python3-pyelftools openssl-devel libuuid-devel gnutls-devel ncurses-libtinfo-devel"
@@ -12,7 +12,7 @@ license="GPL-2.0-or-later, BSD-3-Clause"
 homepage="https://www.denx.de/wiki/U-Boot/"
 distfiles="https://ftp.denx.de/pub/u-boot/u-boot-${version/rc/-rc}.tar.bz2
  https://raw.githubusercontent.com/rockchip-linux/rkbin/57296ad286255d98a3d409036a4b8560b6013b7d/bin/rk35/rk3576_ddr_lp4_2112MHz_lp5_2736MHz_v1.08.bin>rk3576_ddr.bin"
-checksum="ac7c04b8b7004923b00a4e5d6699c5df4d21233bac9fda690d8cfbc209fff2fd
+checksum="78e8bfc382fe388f9b55aa1daf8c563522a037779b5d4c349d1415e381f1243e
  7403cf1663d4b0c9d7c692014e0852e60f0d3977209ec75fa755c293f54e2d50"
 skip_extraction="rk3576_ddr.bin"
 
