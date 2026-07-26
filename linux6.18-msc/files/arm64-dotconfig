@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm64 6.18.39 Kernel Configuration
+# Linux/arm64 6.18.40 Kernel Configuration
 #
 CONFIG_CC_VERSION_TEXT="gcc (GCC) 14.2.1 20250405"
 CONFIG_CC_IS_GCC=y
@@ -6132,6 +6132,7 @@ CONFIG_SND_MPU401=m
 #
 # HD-Audio
 #
+# CONFIG_SND_HDA_INTEL is not set
 # CONFIG_SND_HDA_ACPI is not set
 # end of HD-Audio
 
