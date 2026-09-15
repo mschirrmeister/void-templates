@@ -1,6 +1,6 @@
 # Template file for 'linux7.2-msc'
 pkgname=linux7.2-msc
-version=7.2.5
+version=7.2.6
 revision=1
 archs="aarch64*"
 short_desc="Mainline Linux kernel (stable branch)"
@@ -23,7 +23,7 @@ rc*) distfiles="https://git.kernel.org/torvalds/t/linux-${version%.*}-${version#
 esac
 
 checksum="f9fef3d14c0df53819026f4be74459835c2a0b0dcbf5b5bbd9ea19f0829402b3
- 12398c7d02541f75cc91cb1103bbafa4faa32e04c49d71120229afc3ea13e5bd"
+ 2aef3c30a571ed806c69e90428b229409a43c235aa2540a24593b7e7a8b126cf"
 
 # --- Syndicate Standards ---
 nodebug=yes
