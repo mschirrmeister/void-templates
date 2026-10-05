@@ -1,6 +1,6 @@
 # Template file for 'tsshd'
 pkgname=tsshd
-version=0.1.9
+version=0.1.10
 revision=1
 build_style=go
 go_import_path="github.com/trzsz/tsshd"
@@ -10,7 +10,7 @@ maintainer="Marco Schirrmeister <mschirrmeister@gmail.com>"
 license="MIT"
 homepage="https://github.com/trzsz/tsshd"
 distfiles="https://github.com/trzsz/tsshd/archive/v${version}.tar.gz"
-checksum=fdf05a2323c8cc4ecef30e5258714d1651d80206f1bc0a5a88a45d716e82bb18
+checksum=32b4026724acb076514fe00ab380ab8f3167af6ab3568787a6c4db57be0fced0
 
 # Hardening - Pure static Go build
 export CGO_ENABLED=0
