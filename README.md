@@ -1,49 +1,46 @@
 # void-templates
 
-Native `aarch64` build templates for the Void Linux Syndicate. Focused on high-performance kernel builds and bootloader support for next-gen ARM hardware.
+Void Linux build templates for aarch64, focused on mainline kernels and bootloaders for Rockchip RK35xx boards.
 
-## The Stash
-This repository contains specialized source packages (blueprints) for:
-- **ARM Trusted Firmware (ATF):** Modular builds for RK35xx SoCs.
-- **U-Boot:** Dedicated builds with optimized boot flows (Distro Boot).
-- **Linux Mainline (msc-rc):** Lean, surgical kernel builds with BTF support enabled for Cilium/eBPF cartel operations.
+## Contents
 
-## The Infrastructure
-Blueprints are built natively on an **M4 Pro MacBook** using a RAM-disk accelerated `xbps-src` jailhouse.
+- ARM Trusted Firmware (ATF) with modular builds for RK35xx SoCs.
+- U-Boot with Distro Boot support.
+- Mainline Linux kernels (`msc-rc`), kept lean and built with BTF so Cilium and other eBPF tools work fully.
 
-### Quick Start: Weaponize the Factory
+The packages are built natively on an M4 Pro MacBook, using `xbps-src` with a RAM disk to speed up builds.
 
-1. Clone the official Void Linux factory:
+## Quick start
+
+1. Clone void-packages and bootstrap the build environment:
    ```bash
    git clone --depth 1 https://github.com/void-linux/void-packages.git ~/void-packages
    cd ~/void-packages
    ./xbps-src binary-bootstrap
    ```
 
-2. Clone this repo and link the blueprints:
+2. Clone this repository and link the templates:
    ```bash
    git clone https://github.com/mschirrmeister/void-templates.git ~/void-templates
    cd ~/void-templates
    ./scripts/setup-factory.sh
    ```
 
-3. Fire the M4 Pro engine:
+3. Build a package, for example the current mainline kernel:
    ```bash
    cd ~/void-packages
-   ./xbps-src pkg linux6.19-msc-rc
+   ./xbps-src pkg linux7.3-msc-rc
    ```
 
-## Binary Repository
-Signed binaries are stashed at: `https://mschirrmeister.github.io/voidrepo/`
+## Binary repository
 
-### Trust the Authority
-To install signed cargo from this repository, import the public key:
+Signed binaries are published at `https://mschirrmeister.github.io/voidrepo/`. See [voidrepo](https://github.com/mschirrmeister/voidrepo) for setup. To trust the repository, import the public key:
+
 ```bash
 FP="d6:e0:46:a7:79:30:23:d4:31:ce:d1:35:1e:cf:db:44"
 sudo curl -L -o "/var/db/xbps/keys/${FP}.plist" "https://mschirrmeister.github.io/voidrepo/msc-syndicate.plist"
 ```
 
 ## Maintainer
-**Marco Schirrmeister** - [mschirrmeister@gmail.com](mailto:mschirrmeister@gmail.com)
 
-*Rolling coal on the digital highway since 1995. Stayer of the sweet spot.*
+Marco Schirrmeister ([mschirrmeister@gmail.com](mailto:mschirrmeister@gmail.com))
