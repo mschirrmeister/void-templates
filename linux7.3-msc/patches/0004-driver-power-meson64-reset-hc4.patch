@@ -1,0 +1,204 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Marco Schirrmeister <mschirrmeister@gmail.com>
+Date: Tue, 28 Apr 2026 09:00:00 +0200
+Subject: [PATCH] drivers: power: reset: meson64: Add high-priority SD reset for Odroid-HC4
+
+This patch integrates a specialized hardware reset sequence for the
+Odroid-HC4 into the Meson64 power-reset driver.
+
+On HC4 hardware, Kernel 7.1+ prevents standard GPIO acquisition for SD
+reset due to regulator/MMC ownership locks. This patch bypasses those
+locks by using hardcoded global IDs (600, 603, 611) within a high-priority
+restart handler (priority 130).
+
+By returning NOTIFY_DONE and isolating the HC4 logic, this patch ensures
+successful SD card detection by U-Boot after reboot without disrupting
+standard PSCI reset sequences on other Meson64 boards.
+
+Original GPIO sequence logic based on work by Patrick Yavitz.
+Integrated and ported for Kernel 7.1 by Marco Schirrmeister.
+
+Signed-off-by: Marco Schirrmeister <mschirrmeister@gmail.com>
+
+---
+diff --git a/drivers/power/reset/meson64-reboot.c b/drivers/power/reset/meson64-reboot.c
+index 111111111111..222222222222 100644
+--- a/drivers/power/reset/meson64-reboot.c
++++ b/drivers/power/reset/meson64-reboot.c
+@@ -25,6 +25,40 @@
+ #include <asm/compiler.h>
+ #include <linux/kdebug.h>
+ #include <linux/arm-smccc.h>
++#include <linux/gpio/driver.h>
++
++/* --- HC4 SHADOW BLOCK START --- */
++static bool is_hc4;
++static struct gpio_desc *vqsw_hc4_desc = NULL;
++static struct gpio_desc *vmmc_hc4_desc = NULL;
++static struct gpio_desc *vqen_hc4_desc = NULL;
++
++static void meson64_hc4_card_reset(void)
++{
++    if (!vqsw_hc4_desc && !vmmc_hc4_desc)
++        return;
++
++    if (vqen_hc4_desc) {
++        gpiod_direction_output_raw(vqsw_hc4_desc, 0);
++        gpiod_direction_output_raw(vqen_hc4_desc, 0);
++        gpiod_direction_output_raw(vmmc_hc4_desc, 0);
++        mdelay(100);
++        gpiod_direction_input(vqen_hc4_desc);
++        gpiod_direction_input(vmmc_hc4_desc);
++        gpiod_direction_input(vqsw_hc4_desc);
++    } else {
++        if (vqsw_hc4_desc) gpiod_direction_output_raw(vqsw_hc4_desc, 0);
++        mdelay(10);
++        if (vqsw_hc4_desc) gpiod_set_raw_value(vqsw_hc4_desc, 1);
++        mdelay(10);
++        if (vmmc_hc4_desc) gpiod_direction_output_raw(vmmc_hc4_desc, 0);
++        mdelay(10);
++        if (vqsw_hc4_desc) gpiod_set_raw_value(vqsw_hc4_desc, 0);
++        if (vmmc_hc4_desc) gpiod_set_raw_value(vmmc_hc4_desc, 1);
++    }
++    mdelay(5);
++}
++/* --- HC4 SHADOW BLOCK END --- */
+ 
+ static struct gpio_desc *sd_vqsw_desc;
+ static struct gpio_desc *sd_vmmc_desc;
+@@ -52,10 +86,15 @@
+     return res.a0;
+ }
+ 
+-void meson64_card_reset(void)
++static void meson64_card_reset(void)
+ {
+     int ret = 0;
+ 
++    if (is_hc4) {
++        meson64_hc4_card_reset();
++        return;
++    }
++
+     if (!sd_vqsw_desc && !sd_vmmc_desc)
+         return;
+ 
+@@ -105,14 +144,30 @@
+     }
+ }
+ 
++static int do_meson64_hc4_restart(struct notifier_block *this, unsigned long mode, void *cmd)
++{
++    if (is_hc4)
++        meson64_hc4_card_reset();
++
++    return NOTIFY_DONE;
++}
++
+ static int do_meson64_restart(struct notifier_block *this, unsigned long mode, void *cmd)
+ {
++    if (is_hc4)
++        return NOTIFY_DONE;
++
+     meson64_card_reset();
+     __invoke_psci_fn_smc(psci_function_id_restart,
+                 0, 0, 0);
+     return 0;
+ }
+ 
++static struct notifier_block meson64_hc4_restart_handler = {
++    .notifier_call = do_meson64_hc4_restart,
++    .priority = 130,
++};
++
+ static struct notifier_block meson64_restart_handler = {
+     .notifier_call = do_meson64_restart,
+     .priority = 127,
+@@ -127,17 +182,52 @@
+                 0, 0, 0);
+ }
+ 
++static int aobus_match(struct gpio_chip *chip, const void *data)
++{
++    return strcmp(chip->label, "aobus-banks") == 0;
++}
++
+ static int meson64_restart_probe(struct platform_device *pdev)
+ {
+-    struct device_node *of_node;
++    struct device_node *of_node = pdev->dev.of_node;
++    struct gpio_device *gdev;
+     u32 id;
+-    int ret;
+ 
+-    of_node = pdev->dev.of_node;
++    if (!of_node) {
++        return -ENODEV;
++    }
++
++    if (of_machine_is_compatible("hardkernel,odroid-hc4")) {
++        is_hc4 = true;
++        pr_info("MESON64-REBOOT: HC4 detected. Bypassing standard GPIO locks.\n");
++        
++        gdev = gpio_device_find("aobus-banks", aobus_match);
++        if (gdev) {
++            /* 
++             * SM1 SoC Always-On (AO) bank hardware offsets:
++             * 6 = GPIOAO_6 (SD_Card_VCC_En / sd-vqsw)
++             * 3 = GPIOAO_3 (SD_Card_Power / sd-vmmc)
++             * 11 = GPIOE_2 (SD_Card_Reset / sd-vqen)
++             */
++            vqsw_hc4_desc = gpio_device_get_desc(gdev, 6);
++            vmmc_hc4_desc = gpio_device_get_desc(gdev, 3);
++            vqen_hc4_desc = gpio_device_get_desc(gdev, 11);
++
++            pr_info("MESON64-REBOOT: Direct hardware descriptors acquired (Offsets 6,3,11): VQSW:%px VMMC:%px\n", 
++                    vqsw_hc4_desc, vmmc_hc4_desc);
++            
++            gpio_device_put(gdev);
++        } else {
++            pr_err("MESON64-REBOOT: Could not find aobus-banks!\n");
++        }
++    }
+ 
+     if (!of_property_read_u32(of_node, "sys_reset", &id)) {
+         psci_function_id_restart = id;
+-        register_restart_handler(&meson64_restart_handler);
++        if (is_hc4)
++            register_restart_handler(&meson64_hc4_restart_handler);
++        else
++            register_restart_handler(&meson64_restart_handler);
+     }
+ 
+     if (!of_property_read_u32(of_node, "sys_poweroff", &id)) {
+@@ -145,17 +235,19 @@
+         pm_power_off = do_meson64_poweroff;
+     }
+ 
+-    sd_vqsw_desc = gpiod_get(&pdev->dev, "sd-vqsw", GPIOD_OUT_LOW);
+-    if (IS_ERR(sd_vqsw_desc))
+-        sd_vqsw_desc = NULL;
+-
+-    sd_vmmc_desc = gpiod_get(&pdev->dev, "sd-vmmc", GPIOD_OUT_LOW);
+-    if (IS_ERR(sd_vmmc_desc))
+-        sd_vmmc_desc = NULL;
+-
+-    sd_vqen_desc = gpiod_get(&pdev->dev, "sd-vqen", GPIOD_OUT_LOW);
+-    if (IS_ERR(sd_vqen_desc))
+-        sd_vqen_desc = NULL;
++    if (!is_hc4) {
++        sd_vqsw_desc = gpiod_get(&pdev->dev, "sd-vqsw", GPIOD_OUT_LOW);
++        if (IS_ERR(sd_vqsw_desc))
++            sd_vqsw_desc = NULL;
++
++        sd_vmmc_desc = gpiod_get(&pdev->dev, "sd-vmmc", GPIOD_OUT_LOW);
++        if (IS_ERR(sd_vmmc_desc))
++            sd_vmmc_desc = NULL;
++
++        sd_vqen_desc = gpiod_get(&pdev->dev, "sd-vqen", GPIOD_OUT_LOW);
++        if (IS_ERR(sd_vqen_desc))
++            sd_vqen_desc = NULL;
++    }
+ 
+     return 0;
+ }
